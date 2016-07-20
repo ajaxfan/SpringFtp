@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:int="http://www.springframework.org/schema/integration"
+	xmlns:int-ftp="http://www.springframework.org/schema/integration/ftp"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/integration/ftp 
+        http://www.springframework.org/schema/integration/ftp/spring-integration-ftp.xsd
+        http://www.springframework.org/schema/integration 
+        http://www.springframework.org/schema/integration/spring-integration.xsd">
+	<!-- FTP 的连接信息 -->
+	<bean id="ftpClientFactory"
+		class="org.springframework.integration.ftp.session.DefaultFtpSessionFactory">
+		<!-- 连接的IP地址、端口号、用户名、密码 -->
+		<property name="host" value="192.168.1.135" />
+		<property name="username" value="fx" />
+		<property name="password" value="fx" />
+		<!-- FTP的会话模式采用客户端服务器模式 -->
+		<property name="clientMode" value="0" />
+		<!-- 传输的内容以二进制图片格式 -->
+		<property name="fileType" value="2" />
+		<!-- 缓存空间的大小、可以提升大文件的传输速度 -->
+		<property name="bufferSize" value="10000" />
+	</bean>
+
+	<!-- 建立FTP连接管道 -->
+	<int:channel id="ftpChannel" />
+
+	<!-- 创建FTP的连接和工作目录 -->
+	<int-ftp:outbound-channel-adapter id="ftpOutbound"
+		charset="UTF-8" channel="ftpChannel" remote-directory-expression="headers['file_remoteDirectory']"
+		auto-create-directory="true" remote-file-separator="/"
+		session-factory="ftpClientFactory" />
+
+
+	<int:channel id="toSplitter">
+		<int:interceptors>
+			<int:wire-tap channel="logger" />
+		</int:interceptors>
+	</int:channel>
+
+	<int:logging-channel-adapter id="logger"
+		log-full-message="true" />
+
+	<int:inbound-channel-adapter expression="'/'"
+		channel="inbound" id="ftpInbound">
+		<int:poller fixed-delay="20000" />
+	</int:inbound-channel-adapter>
+	<int-ftp:outbound-gateway id="gatewayLS"
+		local-directory="d:/" session-factory="ftpClientFactory"
+		request-channel="inbound" command="get" remote-directory="/"
+		command-options="-R" expression="payload" reply-channel="toSplitter" />
+</beans>
